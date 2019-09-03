@@ -176,11 +176,6 @@ synch_3       h(mode_4bit, mode_4bit_s, sd_clk,);
 
 always @(posedge sd_clk or negedge reset_n) begin
 
-   if(~reset_n) begin
-      istate <= ST_RESET;
-      distate <= ST_RESET;
-   end else begin
-   
    sd_cmd_last <= sd_cmd;
    sd_dat_last <= sd_dat[0];
       
@@ -332,17 +327,16 @@ always @(posedge sd_clk or negedge reset_n) begin
    default: distate <= ST_RESET;
    endcase
 
+   if(~reset_n) begin
+      istate <= ST_RESET;
+      distate <= ST_RESET;
    end
+
 end
 
 
 always @(negedge sd_clk or negedge reset_n) begin
 
-   if(~reset_n) begin
-      ostate <= ST_RESET;
-      dostate <= ST_RESET;
-   end else begin
-   
    // free running counter
    odc <= odc + 1'b1;
    
@@ -557,7 +551,11 @@ always @(negedge sd_clk or negedge reset_n) begin
    // for snooping real cards
    // sd_dat_oe <= 4'b0;
    // sd_cmd_oe <= 1'b0;
+   if(~reset_n) begin
+      ostate <= ST_RESET;
+      dostate <= ST_RESET;
    end
+   
 end
 
 
