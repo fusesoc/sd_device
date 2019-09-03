@@ -53,8 +53,6 @@ module sd_phy (
 
    output wire         bram_rd_sd_clk,
    output reg  [6:0]   bram_rd_sd_addr,
-   output reg          bram_rd_sd_wren,
-   output reg  [31:0]  bram_rd_sd_data,
    input  wire [31:0]  bram_rd_sd_q,
 
    output wire         bram_wr_sd_clk,
@@ -413,7 +411,6 @@ always @(negedge sd_clk or negedge reset_n) begin
    
    
    dodc <= dodc + 1'b1;
-   bram_rd_sd_wren <= 0;
    
    //
    // data output FSM

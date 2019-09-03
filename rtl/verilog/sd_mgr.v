@@ -19,8 +19,6 @@ module sd_mgr (
 
    input  wire        bram_rd_sd_clk,
    input  wire [6:0]  bram_rd_sd_addr,
-   input  wire        bram_rd_sd_wren,
-   input  wire [31:0] bram_rd_sd_data,
    output wire [31:0] bram_rd_sd_q,
 
    input  wire        bram_rd_ext_clk,
@@ -37,8 +35,6 @@ module sd_mgr (
 
    input  wire        bram_wr_ext_clk,
    input  wire [6:0]  bram_wr_ext_addr,
-   input  wire        bram_wr_ext_wren,
-   input  wire [31:0] bram_wr_ext_data,
    output wire [31:0] bram_wr_ext_q,
 
    input  wire        link_read_act,
@@ -286,9 +282,9 @@ wire [7:0]  bram_rd_ext_addr_sel = (sel_rd_ext ? bram_rd_ext_addr + 8'd128 : bra
 // 512 byte bram (2 x 128 x 32bit word)
 sd_bram_block_dp #(32, 8) isdb1 (
    .a_clk  ( bram_rd_sd_clk ),
-   .a_wr   ( bram_rd_sd_wren ),
+   .a_wr   ( 1'b0 ),
    .a_addr ( bram_rd_sd_addr_sel ),
-   .a_din  ( bram_rd_sd_data ),
+   .a_din  ( 32'd0 ),
    .a_dout ( bram_rd_sd_q ),
    
    .b_clk  ( bram_rd_ext_clk ),
@@ -314,9 +310,9 @@ sd_bram_block_dp #(32, 8) isdb2 (
    .a_dout ( bram_wr_sd_q ),
    
    .b_clk  ( bram_wr_ext_clk ),
-   .b_wr   ( bram_wr_ext_wren ),
+   .b_wr   ( 1'b0 ),
    .b_addr ( bram_wr_ext_addr_sel ),
-   .b_din  ( bram_wr_ext_data ),
+   .b_din  ( 32'd0 ),
    .b_dout ( bram_wr_ext_q )
 );
 

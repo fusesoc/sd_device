@@ -56,8 +56,6 @@ wire [31:0] bram_rd_ext_q;
 
 wire        bram_wr_ext_clk;
 wire [6:0]  bram_wr_ext_addr;
-wire        bram_wr_ext_wren;
-wire [31:0] bram_wr_ext_data;
 wire [31:0] bram_wr_ext_q;
 
 wire        ext_read_act;
@@ -91,8 +89,6 @@ sd_wishbone isdw (
       
    .bram_wr_ext_clk  ( bram_wr_ext_clk ),
    .bram_wr_ext_addr ( bram_wr_ext_addr ),
-   .bram_wr_ext_wren ( bram_wr_ext_wren ),
-   .bram_wr_ext_data ( bram_wr_ext_data ),
    .bram_wr_ext_q    ( bram_wr_ext_q ),
 
    .wbm_clk_o        ( wbm_clk_o ),
@@ -110,8 +106,6 @@ sd_wishbone isdw (
    
 wire         bram_rd_sd_clk;
 wire [6:0]   bram_rd_sd_addr;
-wire         bram_rd_sd_wren;
-wire [31:0]  bram_rd_sd_data;
 wire [31:0]  bram_rd_sd_q;
    
 wire         bram_wr_sd_clk;
@@ -166,8 +160,6 @@ sd_mgr isdm (
    
    .bram_rd_sd_clk   ( bram_rd_sd_clk ),
    .bram_rd_sd_addr  ( bram_rd_sd_addr ),
-   .bram_rd_sd_wren  ( bram_rd_sd_wren ),
-   .bram_rd_sd_data  ( bram_rd_sd_data ),
    .bram_rd_sd_q     ( bram_rd_sd_q ),
    
    .bram_rd_ext_clk  ( bram_rd_ext_clk ),
@@ -184,8 +176,6 @@ sd_mgr isdm (
    
    .bram_wr_ext_clk  ( bram_wr_ext_clk ),
    .bram_wr_ext_addr ( bram_wr_ext_addr ),
-   .bram_wr_ext_wren ( bram_wr_ext_wren ),
-   .bram_wr_ext_data ( bram_wr_ext_data ),
    .bram_wr_ext_q    ( bram_wr_ext_q ),
    
    .link_read_act    ( link_read_act ),
@@ -297,8 +287,6 @@ sd_phy isdph (
 
    .bram_rd_sd_clk   ( bram_rd_sd_clk ),
    .bram_rd_sd_addr  ( bram_rd_sd_addr ),
-   .bram_rd_sd_wren  ( bram_rd_sd_wren ),
-   .bram_rd_sd_data  ( bram_rd_sd_data ),
    .bram_rd_sd_q     ( bram_rd_sd_q ),
    
    .bram_wr_sd_clk   ( bram_wr_sd_clk ),

@@ -35,8 +35,6 @@ module sd_wishbone (
 
    output wire        bram_wr_ext_clk,
    output reg  [6:0]  bram_wr_ext_addr,
-   output wire        bram_wr_ext_wren,
-   output wire [31:0] bram_wr_ext_data,
    input  wire [31:0] bram_wr_ext_q,
 
    // wishbone bus
