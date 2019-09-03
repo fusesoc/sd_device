@@ -279,7 +279,7 @@ always @(posedge sd_clk or negedge reset_n) begin
          if(didc[2:0] == 3'd0) bram_wr_sd_addr <= bram_wr_sd_addr + 1'b1;
          if(didc[2:0] == 3'd7) bram_wr_sd_wren <= 1;
       end else begin
-         bram_wr_sd_data <= {bram_wr_sd_data[31:0], sd_dat[0]};
+         bram_wr_sd_data <= {bram_wr_sd_data[30:0], sd_dat[0]};
          crc16_in0 <= {crc16_in0[14:0], 1'b0} ^ ((sd_dat[0] ^ crc16_in0[15]) ? 16'h1021 : 16'h0);
          
          if(didc[4:0] == 5'd0) bram_wr_sd_addr <= bram_wr_sd_addr + 1'b1;
@@ -447,7 +447,7 @@ always @(negedge sd_clk or negedge reset_n) begin
       
       // preload bram Q data
       dout_buf <= bram_rd_sd_q;
-      data_out_reg_latch <= data_out_reg;
+      data_out_reg_latch <= {1'b0,data_out_reg};
    end
    ST_DATA_WRITE_1: begin
       if(mode_4bit_s) begin
