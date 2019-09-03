@@ -125,16 +125,16 @@ wire         link_write_done;
 wire [31:0]  link_write_addr;
 wire [31:0]  link_write_num;
 
-(* mark_debug = "true" *) wire [47:0] phy_cmd_in;
-(* mark_debug = "true" *) wire        phy_cmd_in_crc_good;
-(* mark_debug = "true" *) wire        phy_cmd_in_act;
-(* mark_debug = "true" *) wire [3:0]  phy_resp_type;
-(* mark_debug = "true" *) wire        phy_resp_act;
-(* mark_debug = "true" *) wire        phy_resp_done;
-(* mark_debug = "true" *) wire [3:0]  link_card_state;
-(* mark_debug = "true" *) wire [10:0] odc;
-(* mark_debug = "true" *) wire [6:0]  ostate;
-(* mark_debug = "true" *) wire [5:0]  cmd_in_cmd;
+wire [47:0] phy_cmd_in;
+wire        phy_cmd_in_crc_good;
+wire        phy_cmd_in_act;
+wire [3:0]  phy_resp_type;
+wire        phy_resp_act;
+wire        phy_resp_done;
+wire [3:0]  link_card_state;
+wire [10:0] odc;
+wire [6:0]  ostate;
+wire [5:0]  cmd_in_cmd;
     
 wire         phy_data_in_act;
 wire         phy_data_in_busy;
