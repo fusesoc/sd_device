@@ -188,7 +188,7 @@ always @(posedge clk_50) begin
                SCR_SD_SPEC3, 13'h0, 2'h0, 32'h0};
       card_sd_status <= {   STAT_DAT_BUS_WIDTH_1, STAT_SECURED_MODE, 7'h0, 6'h0, STAT_SD_CARD_TYPE, 
                      STAT_SIZE_OF_PROT_AREA, STAT_SPEED_CLASS, STAT_PERFORMANCE_MOVE, STAT_AU_SIZE,
-                     4'h0, STAT_ERASE_SIZE, STAT_ERASE_TIMEOUT, STAT_ERASE_OFFSET, 15'h0};
+                     4'h0, STAT_ERASE_SIZE, STAT_ERASE_TIMEOUT, STAT_ERASE_OFFSET, 16'h0};
       // set high speed capability bit
       card_function_caps <= 112'h0032800180018001800180018001 | opt_enable_hs ? 2'b10 : 2'b00;
       card_function <= 24'h0;
