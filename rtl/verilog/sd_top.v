@@ -240,10 +240,21 @@ sd_link isdl (
    .block_write_done     ( link_write_done ),
    .block_write_addr     ( link_write_addr ),
    .block_write_num      ( link_write_num ),
-   
+   .block_preerase_num   (),
+
+   .block_erase_start    (),
+   .block_erase_end      (),
+
    .opt_enable_hs        ( opt_enable_hs )
 
    /* DEBUG SIGNALS */,
+   .cmd_in_last          (),
+   .info_card_desel      (),
+   .err_host_is_spi      (),
+   .err_op_out_range     (),
+   .err_unhandled_cmd    (),
+   .err_cmd_crc          (),
+
    .cmd_in_cmd           ( cmd_in_cmd )
 );
    
