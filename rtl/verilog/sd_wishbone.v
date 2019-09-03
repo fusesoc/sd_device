@@ -85,7 +85,7 @@ reg  wbm_ack_i_last;
    
    
 wire reset_s;
-synch_3 a(reset_n, reset_s, clk_50);
+synch_3 a(reset_n, reset_s, clk_50,);
 
 always @(posedge wbm_clk_o) begin
    ext_read_act_last <= ext_read_act;

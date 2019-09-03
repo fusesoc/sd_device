@@ -164,15 +164,15 @@ wire        data_out_stop_s;
 wire [3:0]  card_state_s;
 wire        mode_4bit_s;
 synch_3       a(data_in_act, data_in_act_s, sd_clk, data_in_act_r);
-synch_3       i(data_in_stop, data_in_stop_s, sd_clk);
-synch_3       j(data_in_another, data_in_another_s, sd_clk);
+synch_3       i(data_in_stop, data_in_stop_s, sd_clk, );
+synch_3       j(data_in_another, data_in_another_s, sd_clk, );
 synch_3       b(resp_act, resp_act_s, sd_clk, resp_act_r);
-synch_3 #(4)  c(resp_type, resp_type_s, sd_clk);
-synch_3 #(10) d(data_out_len, data_out_len_s, sd_clk);
+synch_3 #(4)  c(resp_type, resp_type_s, sd_clk,);
+synch_3 #(10) d(data_out_len, data_out_len_s, sd_clk,);
 synch_3       e(data_out_act, data_out_act_s, sd_clk, data_out_act_r);
-synch_3       f(data_out_stop, data_out_stop_s, sd_clk);
-synch_3 #(4)  g(card_state, card_state_s, sd_clk);
-synch_3       h(mode_4bit, mode_4bit_s, sd_clk);
+synch_3       f(data_out_stop, data_out_stop_s, sd_clk,);
+synch_3 #(4)  g(card_state, card_state_s, sd_clk,);
+synch_3       h(mode_4bit, mode_4bit_s, sd_clk,);
 
 always @(posedge sd_clk or negedge reset_n) begin
 

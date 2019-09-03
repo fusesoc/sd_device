@@ -80,7 +80,7 @@ parameter [4:0] ST_RESET    = 'd0,
 wire reset_s;
 wire ext_read_go_s, ext_read_go_r;
 wire ext_write_done_s, ext_write_done_r;
-synch_3 a(reset_n, reset_s, clk_50);
+synch_3 a(reset_n, reset_s, clk_50,);
 synch_3 b(ext_read_go, ext_read_go_s, clk_50, ext_read_go_r);
 synch_3 c(ext_write_done, ext_write_done_s, clk_50, ext_write_done_r);
 
