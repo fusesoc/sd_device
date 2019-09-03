@@ -99,9 +99,6 @@ reg  [31:0]  card_blocks_written;
 reg  [127:0] resp_arg; // for 32 or 128bit
 reg  [3:0]   resp_type;
 
-reg  [15:0]  dc;
-reg  [15:0]  ddc;
-   
 reg  [6:0]   state;
 parameter [6:0] ST_RESET      = 'd0,
                 ST_IDLE       = 'd4,
@@ -163,11 +160,9 @@ synch_3       j(phy_data_out_done, data_out_done_s, clk_50, data_out_done_r);
 always @(posedge clk_50) begin
 
    // free running counter
-   dc <= dc + 1'b1;
    
    case(state)
    ST_RESET: begin
-      dc <= 0;
       info_card_desel <= 0;
       err_host_is_spi <= 0;
       err_op_out_range <= 0;
@@ -671,8 +666,6 @@ always @(posedge clk_50) begin
    // must be separate so that data packets can be transferred
    // and commands still sent/responsed
    //
-   // free running counter
-   ddc <= ddc + 1'b1;
    
    case(data_state)
    DST_RESET: begin
@@ -703,7 +696,6 @@ always @(posedge clk_50) begin
       end
    end
    DST_IDLE_1: begin
-      ddc <= 0;
       
       // process these data ops while response starts to send
       if(   data_op_send_scr | data_op_send_sdstatus | 

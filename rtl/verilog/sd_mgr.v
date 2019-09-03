@@ -61,7 +61,6 @@ module sd_mgr (
 );
 
 reg [31:0] link_read_addr_latch;
-reg [15:0] dc;
    
 reg [4:0]  state;
 parameter [4:0] ST_RESET    = 'd0,
@@ -89,9 +88,6 @@ synch_3 c(ext_write_done, ext_write_done_s, clk_50, ext_write_done_r);
 
 always @(posedge clk_50) begin
 
-   // free running counter
-   dc <= dc + 1'b1;
-   
    link_write_done <= 0;
    
    case(state)
@@ -115,7 +111,6 @@ always @(posedge clk_50) begin
       state <= ST_IDLE;
    end
    ST_IDLE: begin
-      dc <= 0;
       if(link_read_act) begin
          ext_read_addr <= link_read_addr;
          link_read_addr_latch <= link_read_addr;
@@ -144,7 +139,6 @@ always @(posedge clk_50) begin
          // not in next buffer
          state <= ST_BREAD_1;
       end
-      dc <= 0;
    end
    ST_BREAD_1: begin
       // load block if one is not cached
@@ -174,7 +168,6 @@ always @(posedge clk_50) begin
          ext_read_stop <= 0;
          state <= ST_BREAD_3;
       end
-      dc <= 0;
    end
    ST_BREAD_3: begin
       // preload next block
