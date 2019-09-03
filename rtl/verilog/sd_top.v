@@ -192,13 +192,11 @@ sd_mgr isdm (
    .ext_read_act     ( ext_read_act ),
    .ext_read_go      ( ext_read_go ),
    .ext_read_addr    ( ext_read_addr ),
-   .ext_read_num     (  ),
    .ext_read_stop    ( ext_read_stop ),
    
    .ext_write_act    ( ext_write_act ),
    .ext_write_done   ( ext_write_done ),
-   .ext_write_addr   ( ext_write_addr ),
-   .ext_write_num    (  )
+   .ext_write_addr   ( ext_write_addr )
 );
 
 

@@ -51,13 +51,11 @@ module sd_mgr (
    output reg         ext_read_act,
    input  wire        ext_read_go,
    output reg  [31:0] ext_read_addr,
-   output reg  [31:0] ext_read_num,
    output reg         ext_read_stop,
 
    output reg         ext_write_act,
    input  wire        ext_write_done,
-   output reg  [31:0] ext_write_addr,
-   output reg  [31:0] ext_write_num
+   output reg  [31:0] ext_write_addr
 );
 
 reg [31:0] link_read_addr_latch;
@@ -114,13 +112,11 @@ always @(posedge clk_50) begin
       if(link_read_act) begin
          ext_read_addr <= link_read_addr;
          link_read_addr_latch <= link_read_addr;
-         //ext_read_num <= link_read_num;
          ext_read_stop <= 0;
          state <= ST_BREAD_0;
       end else
       if(link_write_act) begin
          ext_write_addr <= link_write_addr;
-         //ext_write_num <= link_write_num;
          state <= ST_BWRITE_0;
       end
    end
