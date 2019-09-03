@@ -265,8 +265,8 @@ reg  [31:0] buf_rd_a_block;
 reg  [31:0] buf_rd_b_block;
    
 // address two sector buffers inside the bram
-wire [7:0]  bram_rd_sd_addr_sel = (sel_rd_sd ? bram_rd_sd_addr + 8'd128 : bram_rd_sd_addr) /* synthesis keep */;
-wire [7:0]  bram_rd_ext_addr_sel = (sel_rd_ext ? bram_rd_ext_addr + 8'd128 : bram_rd_ext_addr) /* synthesis keep */;
+wire [7:0]  bram_rd_sd_addr_sel = (sel_rd_sd ? bram_rd_sd_addr + 8'd128 : {1'b0,bram_rd_sd_addr}) /* synthesis keep */;
+wire [7:0]  bram_rd_ext_addr_sel = (sel_rd_ext ? bram_rd_ext_addr + 8'd128 : {1'b0,bram_rd_ext_addr}) /* synthesis keep */;
    
 // 512 byte bram (2 x 128 x 32bit word)
 sd_bram_block_dp #(32, 8) isdb1 (
@@ -287,8 +287,8 @@ reg  sel_wr_sd;
 reg  sel_wr_ext;
    
 // address two sector buffers inside the bram
-wire [7:0] bram_wr_sd_addr_sel = (sel_wr_sd ? bram_wr_sd_addr + 8'd128 : bram_wr_sd_addr) /* synthesis keep */;
-wire [7:0] bram_wr_ext_addr_sel = (sel_wr_ext ? bram_wr_ext_addr + 8'd128 : bram_wr_ext_addr) /* synthesis keep */;
+wire [7:0] bram_wr_sd_addr_sel = (sel_wr_sd ? bram_wr_sd_addr + 8'd128 : {1'b0,bram_wr_sd_addr}) /* synthesis keep */;
+wire [7:0] bram_wr_ext_addr_sel = (sel_wr_ext ? bram_wr_ext_addr + 8'd128 : {1'b0,bram_wr_ext_addr}) /* synthesis keep */;
    
 // 512 byte bram (2 x 128 x 32bit word)
 sd_bram_block_dp #(32, 8) isdb2 (
