@@ -12,7 +12,11 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+   This version has been modified with SPI mode support. Changes are:
+   Copyright 2017, Micah Elizabeth Scott, licensed under identical terms. 
 */
+
 //
 // 2-stage synchronizer
 //

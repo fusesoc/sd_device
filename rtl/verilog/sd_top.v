@@ -153,6 +153,9 @@ wire         phy_data_out_busy;
 wire         phy_data_out_act;
 wire         phy_data_out_stop;
 wire         phy_data_out_done;
+wire         phy_spi_sel;
+wire         phy_mode_spi;
+wire         phy_mode_crc_disable;
 
 sd_mgr isdm (
    .clk_50           ( clk_50 ),
@@ -209,6 +212,7 @@ sd_link isdl (
    .phy_cmd_in           ( phy_cmd_in ),
    .phy_cmd_in_crc_good  ( phy_cmd_in_crc_good ),
    .phy_cmd_in_act       ( phy_cmd_in_act ),
+   .phy_spi_sel          ( phy_spi_sel ),
    .phy_data_in_act      ( phy_data_in_act ),
    .phy_data_in_busy     ( phy_data_in_busy ),
    .phy_data_in_another  ( phy_data_in_another ),
@@ -222,6 +226,8 @@ sd_link isdl (
    .phy_resp_act         ( phy_resp_act ),
    .phy_resp_done        ( phy_resp_done ),
    .phy_mode_4bit        ( phy_mode_4bit ),
+   .phy_mode_spi         ( phy_mode_spi ),
+   .phy_mode_crc_disable ( phy_mode_crc_disable ),
    .phy_data_out_reg     ( phy_data_out_reg ),
    .phy_data_out_src     ( phy_data_out_src ),
    .phy_data_out_len     ( phy_data_out_len ),
@@ -233,12 +239,14 @@ sd_link isdl (
    .block_read_act       ( link_read_act ),
    .block_read_go        ( link_read_go ),
    .block_read_addr      ( link_read_addr ),
+   .block_read_byteaddr  ( ),
    .block_read_num       ( link_read_num ),
    .block_read_stop      ( link_read_stop ),
    
    .block_write_act      ( link_write_act ),
    .block_write_done     ( link_write_done ),
    .block_write_addr     ( link_write_addr ),
+   .block_write_byteaddr ( ),
    .block_write_num      ( link_write_num ),
    .block_preerase_num   (),
 
@@ -250,11 +258,10 @@ sd_link isdl (
    /* DEBUG SIGNALS */,
    .cmd_in_last          (),
    .info_card_desel      (),
-   .err_host_is_spi      (),
    .err_op_out_range     (),
    .err_unhandled_cmd    (),
    .err_cmd_crc          (),
-
+   .host_hc_support      (),
    .cmd_in_cmd           ( cmd_in_cmd )
 );
    
@@ -286,6 +293,9 @@ sd_phy isdph (
    .resp_act         ( phy_resp_act ),
    .resp_done        ( phy_resp_done ),
    .mode_4bit        ( phy_mode_4bit ),
+   .mode_spi         ( phy_mode_spi ),
+   .mode_crc_disable ( phy_mode_crc_disable ),
+   .spi_sel          ( phy_spi_sel ),
    .data_out_reg     ( phy_data_out_reg ),
    .data_out_src     ( phy_data_out_src ),
    .data_out_len     ( phy_data_out_len ),
@@ -306,6 +316,7 @@ sd_phy isdph (
 
     /* DEBUG SIGNALS */,   
    .odc              ( odc ),
+   .spi_cnt          (),
    .ostate           ( ostate )
 );
 

@@ -12,7 +12,11 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+   This version has been modified with SPI mode support. Changes are:
+   Copyright 2017, Micah Elizabeth Scott, licensed under identical terms. 
 */
+
 module sd_link (
    input  wire         clk_50,
    input  wire         reset_n,
@@ -22,6 +26,7 @@ module sd_link (
    input  wire [47:0]  phy_cmd_in,
    input  wire         phy_cmd_in_crc_good,
    input  wire         phy_cmd_in_act,
+   input  wire         phy_spi_sel,
    output reg          phy_data_in_act,
    input  wire         phy_data_in_busy,
    output reg          phy_data_in_stop,
@@ -35,6 +40,8 @@ module sd_link (
    output reg          phy_resp_act,
    input  wire         phy_resp_done,
    output reg          phy_mode_4bit,
+   output reg          phy_mode_spi,
+   output reg          phy_mode_crc_disable,
    output reg  [511:0] phy_data_out_reg,
    output reg          phy_data_out_src,
    output reg  [9:0]   phy_data_out_len,
@@ -46,12 +53,14 @@ module sd_link (
    output reg          block_read_act,
    input  wire         block_read_go,
    output reg  [31:0]  block_read_addr,
+   output reg  [31:0]  block_read_byteaddr,
    output reg  [31:0]  block_read_num,
    output reg          block_read_stop,
 
    output reg          block_write_act,
    input  wire         block_write_done,
    output reg  [31:0]  block_write_addr,
+   output reg  [31:0]  block_write_byteaddr,
    output reg  [31:0]  block_write_num,
    output reg  [22:0]  block_preerase_num,
 
@@ -62,11 +71,13 @@ module sd_link (
 
    output reg  [5:0]   cmd_in_last,
    output reg          info_card_desel,
-   output reg          err_host_is_spi,
    output reg          err_op_out_range,
    output reg          err_unhandled_cmd,
    output reg          err_cmd_crc
    ,
+
+   // Debug/status outputs
+   output reg          host_hc_support,
    output wire [5:0]   cmd_in_cmd
 );
 
@@ -78,11 +89,14 @@ reg  [47:0]  cmd_in_latch;
 assign cmd_in_cmd = cmd_in_latch[45:40];
 wire [31:0]  cmd_in_arg = cmd_in_latch[39:8] /* synthesis noprune */;
 wire [6:0]   cmd_in_crc = cmd_in_latch[7:1];
-   
+
+// High capacity mode uses blocks natively, legacy mode byte offsets are converted here
+wire [31:0]  cmd_in_arg_blockaddr = host_hc_support ? cmd_in_arg : { 9'b0, cmd_in_arg[31:9] };
+wire [31:0]  cmd_in_arg_byteaddr = host_hc_support ? { cmd_in_arg[22:0], 9'b0 } : cmd_in_arg;
+
 reg  [3:0]   card_state;
 assign       link_card_state = card_state;
 reg  [3:0]   card_state_next;
-reg  [3:0]   card_acmd41_count;
 reg  [2:0]   card_erase_state;
 reg          card_appcmd;
 reg  [31:0]  card_status;
@@ -126,7 +140,30 @@ parameter [6:0] DST_RESET      = 'd0,
                 DST_DATA_IN_5  = 'd25,
                 DST_LAST       = 'd127;
 
+wire [15:0] spi_status_word = {
+   // R1
+   1'b0,
+   card_status[STAT_ADDRESS_ERROR] | card_status[STAT_BLOCK_LEN_ERROR] | card_status[STAT_ERASE_PARAM],
+   card_status[STAT_ADDRESS_ERROR],
+   card_status[STAT_ERASE_SEQ_ERROR],
+   card_status[STAT_COM_CRC_ERROR],
+   card_status[STAT_ILLEGAL_COMMAND],
+   card_status[STAT_ERASE_RESET],
+   card_state == CARD_IDLE,
+   // R2
+   card_status[STAT_OUT_OF_RANGE] | card_status[STAT_CSD_OVERWRITE],
+   card_status[STAT_ERASE_PARAM],
+   card_status[STAT_WP_VIOLATION],
+   card_status[STAT_CARD_ECC_FAILED],
+   card_status[STAT_CC_ERROR],
+   card_status[STAT_ERROR],
+   card_status[STAT_WP_ERASE_SKIP] | card_status[STAT_LOCK_UNLOCK_FAILED],
+   card_status[STAT_CARD_IS_LOCKED]
+};
+
 reg data_op_send_scr;
+reg data_op_send_cid;
+reg data_op_send_csd;
 reg data_op_send_sdstatus;
 reg data_op_send_function;
 reg data_op_send_written;
@@ -140,6 +177,7 @@ wire        reset_s;
 wire [47:0] cmd_in_s;
 wire        cmd_in_crc_good_s;
 wire        cmd_in_act_s, cmd_in_act_r;
+wire        spi_sel_s;
 wire        data_in_busy_s;
 wire        data_in_done_s, data_in_done_r;
 wire        data_in_crc_good_s;
@@ -156,6 +194,8 @@ synch_3       g(phy_data_in_crc_good, data_in_crc_good_s, clk_50,);
 synch_3       h(phy_resp_done, resp_done_s, clk_50, resp_done_r);
 synch_3       i(phy_data_out_busy, data_out_busy_s, clk_50,);
 synch_3       j(phy_data_out_done, data_out_done_s, clk_50, data_out_done_r);
+synch_3       k(phy_spi_sel, spi_sel_s, clk_50,);
+
 
 always @(posedge clk_50) begin
 
@@ -164,12 +204,10 @@ always @(posedge clk_50) begin
    case(state)
    ST_RESET: begin
       info_card_desel <= 0;
-      err_host_is_spi <= 0;
       err_op_out_range <= 0;
       err_unhandled_cmd <= 0;
       err_cmd_crc <= 0;
       card_erase_state <= 0;
-      card_acmd41_count <= 0;
       card_blocks_written <= 0;
       card_appcmd <= 0;
       card_rca <= 16'h0;
@@ -196,6 +234,8 @@ always @(posedge clk_50) begin
       card_function_check <= 24'h0;   
    
       data_op_send_scr <= 0;   
+      data_op_send_cid <= 0;   
+      data_op_send_csd <= 0;   
       data_op_send_sdstatus <= 0;
       data_op_send_function <= 0;
       data_op_send_written <= 0;
@@ -210,15 +250,20 @@ always @(posedge clk_50) begin
       phy_data_out_act <= 0;
       phy_data_out_stop <= 0;
       phy_mode_4bit <= 0;   
-      
+      phy_mode_crc_disable <= phy_mode_spi;
+
       block_read_act <= 0;
       block_read_num <= 0;
       block_read_stop <= 0;
       block_write_act <= 0;
       block_write_num <= 0;
       block_preerase_num <= 0;
-      
-      state <= ST_IDLE;
+
+      // By default the host doesn't support high capacity mode
+      host_hc_support <= 0;
+
+      // In SPI mode, reset gets an R1 response      
+      state <= phy_mode_spi ? ST_CMD_RESP_0 : ST_IDLE;
    end
    ST_IDLE: begin
       // rising edge + crc is good
@@ -226,7 +271,7 @@ always @(posedge clk_50) begin
          phy_resp_act <= 0;
          if(cmd_in_crc_good_s) begin
             // new command
-            cmd_in_latch <= phy_cmd_in; //cmd_in_s;
+            cmd_in_latch <= phy_cmd_in;
             card_status[STAT_COM_CRC_ERROR] <= 0;
             card_status[STAT_ILLEGAL_COMMAND] <= 0;
             state <= ST_CMD_ACT;
@@ -251,18 +296,30 @@ always @(posedge clk_50) begin
          case(cmd_in_cmd)
          CMD0_GO_IDLE: begin
             if(card_state != CARD_INA) begin
-               // reset everything to default
-               resp_type <= RESP_NONE;
+               // reset to default, optionally enter SPI mode.
                state <= ST_RESET;
                data_state <= DST_RESET;
+               if (phy_mode_spi | spi_sel_s) begin
+                  phy_mode_spi <= 1'b1;
+                  resp_type <= RESP_R1;
+               end
+               else begin
+                  resp_type <= RESP_NONE;
+               end
             end
          end
-         CMD2_ALL_SEND_CID: case(card_state)
-            CARD_READY: begin
-            resp_type <= RESP_R2;
-            card_state_next <= CARD_IDENT;
+         CMD1_SEND_OP_COND: begin
+            if (card_state == CARD_IDLE || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               host_hc_support <= cmd_in_arg[30];
             end
-         endcase
+         end
+         CMD2_ALL_SEND_CID: begin
+            if (card_state == CARD_READY || phy_mode_spi) begin
+               resp_type <= RESP_R2;
+               card_state_next <= CARD_IDENT;
+            end
+         end
          CMD3_SEND_REL_ADDR : case(card_state)
             CARD_IDENT, CARD_STBY: begin
             card_rca <= card_rca + 16'h1337;
@@ -333,14 +390,13 @@ always @(posedge clk_50) begin
                resp_type <= RESP_NONE;
             end
          end
-         CMD8_SEND_IF_COND: case(card_state)
-            CARD_IDLE: begin
-            if(cmd_in_arg[11:8] == 4'b0001) begin
+         CMD8_SEND_IF_COND: begin
+            if ( ((card_state == CARD_IDLE) & (cmd_in_arg[11:8] == 4'b0001))
+                 | phy_mode_spi ) begin
                resp_type <= RESP_R7;
                resp_arg[31:0] <= {20'h0, 4'b0001, cmd_in_arg[7:0]};
             end else resp_type <= RESP_NONE;
-            end
-         endcase
+         end
          CMD9_SEND_CSD: begin
             if(cmd_in_arg[31:16] == card_rca) begin
                case(card_state)
@@ -349,6 +405,10 @@ always @(posedge clk_50) begin
                end
                endcase
             end else resp_type <= RESP_NONE;
+            if(phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               data_op_send_csd <= 1;
+            end
          end
          CMD10_SEND_CID: begin
             if(cmd_in_arg[31:16] == card_rca) begin
@@ -358,6 +418,10 @@ always @(posedge clk_50) begin
                end
                endcase
             end else resp_type <= RESP_NONE;
+            if(phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               data_op_send_cid <= 1;
+            end
          end
          CMD12_STOP: case(card_state)
             // N.B. should not be allowed in PRG state, but readers do anyway
@@ -379,6 +443,9 @@ always @(posedge clk_50) begin
                end
                endcase
             end else resp_type <= RESP_NONE;
+            if(phy_mode_spi) begin
+               resp_type <= RESP_R2;
+            end            
          end
          CMD15_GO_INACTIVE: begin
             if(cmd_in_arg[31:16] == card_rca) begin
@@ -390,100 +457,104 @@ always @(posedge clk_50) begin
                endcase
             end else resp_type <= RESP_NONE;
          end
-         CMD16_SET_BLOCKLEN: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            if(cmd_in_arg > 512) card_status[STAT_BLOCK_LEN_ERROR] <= 1;
-            end
-         endcase
-         CMD17_READ_SINGLE: case(card_state)
-            CARD_TRAN: begin
-            if(cmd_in_arg >= SD_TOTAL_BLOCKS) begin
-               card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
-            end else begin
+         CMD16_SET_BLOCKLEN: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
                resp_type <= RESP_R1;
-               block_read_addr <= cmd_in_arg;
-               block_read_num <= 1;
-               data_op_send_block_queue <= 1;
-               card_state_next <= CARD_DATA;
+               if(cmd_in_arg > 512) card_status[STAT_BLOCK_LEN_ERROR] <= 1;
             end
+         end
+         CMD17_READ_SINGLE: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               if(cmd_in_arg_blockaddr >= SD_TOTAL_BLOCKS) begin
+                  card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
+               end else begin
+                  resp_type <= RESP_R1;
+                  block_read_addr <= cmd_in_arg_blockaddr;
+                  block_read_byteaddr <= cmd_in_arg_byteaddr;
+                  block_read_num <= 1;
+                  data_op_send_block_queue <= 1;
+                  card_state_next <= CARD_DATA;
+               end
             end
-         endcase
-         CMD18_READ_MULTIPLE: case(card_state)
-            CARD_TRAN: begin
-            if(cmd_in_arg >= SD_TOTAL_BLOCKS) begin
-               card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
-            end else begin
-               resp_type <= RESP_R1;
-               block_read_addr <= cmd_in_arg;
-               block_read_num <= 32'hFFFFFFFF;
-               data_op_send_block_queue <= 1;
-               card_state_next <= CARD_DATA;
+         end
+         CMD18_READ_MULTIPLE: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               if(cmd_in_arg_blockaddr >= SD_TOTAL_BLOCKS) begin
+                  card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
+               end else begin
+                  resp_type <= RESP_R1;
+                  block_read_addr <= cmd_in_arg_blockaddr;
+                  block_read_byteaddr <= cmd_in_arg_byteaddr;
+                  block_read_num <= 32'hFFFFFFFF;
+                  data_op_send_block_queue <= 1;
+                  card_state_next <= CARD_DATA;
+               end
             end
+         end
+         CMD24_WRITE_SINGLE: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               if(cmd_in_arg_blockaddr >= SD_TOTAL_BLOCKS) begin
+                  card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
+               end else begin
+                  resp_type <= RESP_R1;
+                  block_write_addr <= cmd_in_arg_blockaddr;
+                  block_write_byteaddr <= cmd_in_arg_byteaddr;
+                  block_write_num <= 1;
+                  card_blocks_written <= 0;
+                  data_op_recv_block <= 1;
+                  card_state_next <= CARD_RCV;
+               end
             end
-         endcase
-         CMD24_WRITE_SINGLE: case(card_state)
-            CARD_TRAN: begin
-            if(cmd_in_arg >= SD_TOTAL_BLOCKS) begin
-               card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
-            end else begin
-               resp_type <= RESP_R1;
-               block_write_addr <= cmd_in_arg;
-               block_write_num <= 1;
-               card_blocks_written <= 0;
-               data_op_recv_block <= 1;
-               card_state_next <= CARD_RCV;
+         end
+         CMD25_WRITE_MULTIPLE: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               if(cmd_in_arg_blockaddr >= SD_TOTAL_BLOCKS) begin
+                  card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
+               end else begin
+                  resp_type <= RESP_R1;
+                  block_write_addr <= cmd_in_arg_blockaddr;
+                  block_write_byteaddr <= cmd_in_arg_byteaddr;
+                  block_write_num <= 32'hFFFFFFFF;
+                  card_blocks_written <= 0;
+                  data_op_recv_block <= 1;
+                  card_state_next <= CARD_RCV;
+               end
             end
-            end
-         endcase
-         CMD25_WRITE_MULTIPLE: case(card_state)
-            CARD_TRAN: begin
-            if(cmd_in_arg >= SD_TOTAL_BLOCKS) begin
-               card_status[STAT_OUT_OF_RANGE] <= 1'b1; err_op_out_range <= 1;
-            end else begin
-               resp_type <= RESP_R1;
-               block_write_addr <= cmd_in_arg;
-               block_write_num <= 32'hFFFFFFFF;
-               card_blocks_written <= 0;
-               data_op_recv_block <= 1;
-               card_state_next <= CARD_RCV;
-            end
-            end
-         endcase
+         end
          //CMD27_PROGRAM_CSD: begin
          //end
-         CMD32_ERASE_START: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            card_erase_state <= 0;
-            if(card_erase_state == 0) begin
-               block_erase_start <= cmd_in_arg;
-               card_erase_state <= 1;
-            end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
+         CMD32_ERASE_START: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               card_erase_state <= 0;
+               if(card_erase_state == 0) begin
+                  block_erase_start <= cmd_in_arg_blockaddr;
+                  card_erase_state <= 1;
+               end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
             end
-         endcase
-         CMD33_ERASE_END: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            card_erase_state <= 0;
-            if(card_erase_state == 1) begin
-               block_erase_end <= cmd_in_arg;
-               card_erase_state <= 2;
-            end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
+         end
+         CMD33_ERASE_END: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               card_erase_state <= 0;
+               if(card_erase_state == 1) begin
+                  block_erase_end <= cmd_in_arg_blockaddr;
+                  card_erase_state <= 2;
+               end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
             end
-         endcase
-         CMD38_ERASE: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1B;
-            card_erase_state <= 0;
-            if(card_erase_state == 2) begin
-               // process erase 
-               
-            end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
-            // since erase are unimpl they happen immediately
-            //card_state_next <= CARD_PRG;
+         end
+         CMD38_ERASE: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1B;
+               card_erase_state <= 0;
+               if(card_erase_state == 2) begin
+                  // process erase 
+                  
+               end else card_status[STAT_ERASE_SEQ_ERROR] <= 1'b1;
+               // since erase are unimpl they happen immediately
+               //card_state_next <= CARD_PRG;
             end
-         endcase
+         end
          //CMD42_LOCK_UNLOCK: begin
          //end
          CMD55_APP_CMD: begin
@@ -496,17 +567,27 @@ always @(posedge clk_50) begin
                end
                endcase
             end else resp_type <= RESP_NONE;
+            if(phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               card_appcmd <= 1;
+               card_status[STAT_APP_CMD] <= 1;
+            end
          end
          //CMD56_GEN_CMD: begin
          //end
+         CMD58_READ_OCR: begin
+            resp_type <= RESP_R3;
+         end
+         CMD59_CRC_ON_OFF: begin
+            phy_mode_crc_disable <= ~cmd_in_arg[0];
+            resp_type <= RESP_R1;
+         end
          default: begin
             err_unhandled_cmd <= 1;
             if(cmd_in_cmd == 6'd1) err_unhandled_cmd <= 0; // CMD1 for SPI cards
             if(cmd_in_cmd == 6'd5) err_unhandled_cmd <= 0; // CMD5 for SDIO combo cards
          end
          endcase
-         // CMD1 is only used in SPI mode, which is not supported
-         if(cmd_in_cmd == 6'h1) err_host_is_spi <= 1;
          // check for illegal commands during an expected erase sequence
          if(card_erase_state > 0) begin
             if(   cmd_in_cmd != CMD13_SEND_STATUS && 
@@ -519,63 +600,55 @@ always @(posedge clk_50) begin
       end else begin
          // ACMD
          case(cmd_in_cmd)
-         ACMD6_SET_BUS_WIDTH: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            phy_mode_4bit <= cmd_in_arg[1];
+         ACMD6_SET_BUS_WIDTH: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               phy_mode_4bit <= cmd_in_arg[1];
             end
-         endcase
-         ACMD13_SD_STATUS: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            // send SD status
-            data_op_send_sdstatus <= 1;
-            card_state_next <= CARD_DATA;
+         end
+         ACMD13_SD_STATUS: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               // send SD status
+               data_op_send_sdstatus <= 1;
+               card_state_next <= CARD_DATA;
             end
-         endcase
-         ACMD22_NUM_WR_BLK: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            // send number blocks written
-            data_op_send_written <= 1;
-            card_state_next <= CARD_DATA;
+         end
+         ACMD22_NUM_WR_BLK: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               // send number blocks written
+               data_op_send_written <= 1;
+               card_state_next <= CARD_DATA;
             end
-         endcase
-         ACMD23_SET_WR_BLK: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            block_preerase_num[22:0] <= cmd_in_arg[22:0];
+         end
+         ACMD23_SET_WR_BLK: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               block_preerase_num[22:0] <= cmd_in_arg[22:0];
             end
-         endcase
-         ACMD41_SEND_OP_COND: case(card_state)
-            CARD_IDLE: begin
-            resp_type <= RESP_R3;
-            card_acmd41_count <= card_acmd41_count + 1'b1;
-            if(cmd_in_arg[23:0] == 24'h0) begin
-               // ocr is zero, this is a query.
-               
-            end else
-            if(cmd_in_arg[30]) begin
-               // is host SDHC compatible? otherwise we'll never be ready
-               if(card_acmd41_count > 2) begin
-                  card_ocr[OCR_POWERED_UP] <= 1;
-                  card_state_next <= CARD_READY;
-               end
-            end 
+         end
+         ACMD41_SEND_OP_COND: begin
+            if (card_state == CARD_IDLE || phy_mode_spi) begin
+               resp_type <= RESP_R3;
+               card_ocr[OCR_POWERED_UP] <= 1;
+               card_state_next <= CARD_READY;
+               host_hc_support <= cmd_in_arg[30];
             end
-         endcase
-         ACMD42_SET_CARD_DET: case(card_state)
-            // card detect pullup is unsupported
-            CARD_TRAN: resp_type <= RESP_R1;
-         endcase
-         ACMD51_SEND_SCR: case(card_state)
-            CARD_TRAN: begin
-            resp_type <= RESP_R1;
-            // send SCR
-            data_op_send_scr <= 1;
-            card_state_next <= CARD_DATA;
+         end
+         ACMD42_SET_CARD_DET: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
             end
-         endcase
+         end
+         ACMD51_SEND_SCR: begin
+            if (card_state == CARD_TRAN || phy_mode_spi) begin
+               resp_type <= RESP_R1;
+               // send SCR
+               data_op_send_scr <= 1;
+               card_state_next <= CARD_DATA;
+            end
+         end
          default: begin
             // retry this as a regular CMD (retry this state with APPCMD=0)
             state <= ST_CMD_ACT;
@@ -604,24 +677,38 @@ always @(posedge clk_50) begin
          state <= ST_IDLE;
       end
       RESP_BAD: begin
-         // illegal
          card_status[STAT_ILLEGAL_COMMAND] <= 1;
-         state <= ST_IDLE;
+         if (phy_mode_spi) begin
+            // SPI mode; R1 response with 'illegal command' bit already set
+            phy_resp_out <= {spi_status_word[15:11], 1'b1, spi_status_word[9:8], 128'h0};            
+         end
+         else begin
+            // SD mode
+            state <= ST_IDLE;
+         end
       end
       RESP_R1, RESP_R1B: begin
-         phy_resp_out <= {2'b00, cmd_in_cmd, card_status, 8'h1, 88'h0};
+         phy_resp_out <= phy_mode_spi ?
+            {spi_status_word[15:8], 128'h0} :
+            {2'b00, cmd_in_cmd, card_status, 8'h1, 88'h0};
       end
       RESP_R2: begin
-         phy_resp_out <= {2'b00, 6'b111111, cmd_in_cmd == CMD9_SEND_CSD ? card_csd[127:1] : card_cid[127:1], 1'b1};
+         phy_resp_out <= phy_mode_spi ?
+            {spi_status_word[15:0], 120'h0} :
+            {2'b00, 6'b111111, cmd_in_cmd == CMD9_SEND_CSD ? card_csd[127:1] : card_cid[127:1], 1'b1};
       end
       RESP_R3: begin
-         phy_resp_out <= {2'b00, 6'b111111, card_ocr, 8'hFF, 88'h0};
+         phy_resp_out <= phy_mode_spi ?
+            {spi_status_word[15:8], card_ocr, 96'h0 } :
+            {2'b00, 6'b111111, card_ocr, 8'hFF, 88'h0};
       end
       RESP_R6: begin
          phy_resp_out <= {2'b00, 6'b000011, card_rca, {card_status[23:22], card_status[19], card_status[12:0]}, 8'h1, 88'h0};
       end
       RESP_R7: begin
-         phy_resp_out <= {2'b00, 6'b001000, resp_arg[31:0], 8'h1, 88'h0};
+         phy_resp_out <= phy_mode_spi ?
+            {spi_status_word[15:8], resp_arg[31:0], 96'h0} :
+            {2'b00, 6'b001000, resp_arg[31:0], 8'h1, 88'h0};
       end
       endcase      
    end
@@ -658,6 +745,30 @@ always @(posedge clk_50) begin
          endcase
          card_state <= card_state_next;
          state <= ST_IDLE;
+
+         // Clear bits for SPI status responses
+         if (phy_mode_spi) begin
+            // R1
+            card_status[STAT_BLOCK_LEN_ERROR] <= 0;
+            card_status[STAT_ADDRESS_ERROR] <= 0;
+            card_status[STAT_ERASE_SEQ_ERROR] <= 0;
+            card_status[STAT_COM_CRC_ERROR] <= 0;
+            card_status[STAT_ILLEGAL_COMMAND] <= 0;
+            card_status[STAT_ERASE_RESET] <= 0;
+            // R2
+            if (phy_resp_type == RESP_R2) begin
+               card_status[STAT_OUT_OF_RANGE] <= 0;
+               card_status[STAT_CSD_OVERWRITE] <= 0;
+               card_status[STAT_ERASE_PARAM] <= 0;
+               card_status[STAT_WP_VIOLATION] <= 0;
+               card_status[STAT_CARD_ECC_FAILED] <= 0;
+               card_status[STAT_CC_ERROR] <= 0;
+               card_status[STAT_ERROR] <= 0;
+               card_status[STAT_WP_ERASE_SKIP] <= 0;
+               card_status[STAT_LOCK_UNLOCK_FAILED] <= 0;
+               card_status[STAT_CARD_IS_LOCKED] <= 0;
+            end
+         end
       end
    end
    endcase
@@ -680,7 +791,7 @@ always @(posedge clk_50) begin
          // for data receive ops
          data_state <= DST_DATA_IN_0;
       end else   
-      if(   data_op_send_scr | data_op_send_sdstatus | 
+      if(   data_op_send_scr | data_op_send_sdstatus | data_op_send_cid | data_op_send_csd |
          data_op_send_function | data_op_send_written | data_op_send_block_queue ) begin
          
          // move to next state once response is processing
@@ -699,7 +810,7 @@ always @(posedge clk_50) begin
    DST_IDLE_1: begin
       
       // process these data ops while response starts to send
-      if(   data_op_send_scr | data_op_send_sdstatus | 
+      if(   data_op_send_scr | data_op_send_sdstatus | data_op_send_cid | data_op_send_csd |
          data_op_send_function | data_op_send_written | data_op_send_block ) begin
          
          phy_data_out_src <= 1; // default: send from register
@@ -729,6 +840,16 @@ always @(posedge clk_50) begin
             phy_data_out_src <= 0; // send data from bram
             phy_data_out_len <= 512;
             data_state <= DST_DATA_OUT_5;
+         end
+         if(data_op_send_cid) begin
+            data_op_send_cid <= 0;
+            phy_data_out_len <= 16;
+            phy_data_out_reg <= {card_cid, 384'h0};
+         end
+         if(data_op_send_csd) begin
+            data_op_send_csd <= 0;
+            phy_data_out_len <= 16;
+            phy_data_out_reg <= {card_csd, 384'h0};
          end
       end
    end
@@ -804,6 +925,7 @@ always @(posedge clk_50) begin
                card_state <= card_state;
                block_read_addr <= block_read_addr + 1'b1;
                block_read_num <= block_read_num - 1'b1; 
+               block_read_byteaddr <= block_read_byteaddr + 512;
                if(block_read_addr >= SD_TOTAL_BLOCKS) begin 
                   card_status[STAT_OUT_OF_RANGE] <= 1'b1; 
                   err_op_out_range <= 1; 
@@ -874,6 +996,7 @@ always @(posedge clk_50) begin
          card_status[STAT_READY_FOR_DATA] <= 1'b1;
          block_write_addr <= block_write_addr + 1'b1; 
          block_write_num <= block_write_num - 1'b1; 
+         block_write_byteaddr <= block_write_byteaddr + 512;
          if(block_write_addr >= SD_TOTAL_BLOCKS) begin 
             card_status[STAT_OUT_OF_RANGE] <= 1'b1; 
             err_op_out_range <= 1; 
@@ -886,6 +1009,8 @@ always @(posedge clk_50) begin
    if(~reset_s) begin
       state <= ST_RESET;
       data_state <= DST_RESET;
+      phy_mode_spi <= 0;
+      phy_mode_crc_disable <= 0;
    end    
 end
 

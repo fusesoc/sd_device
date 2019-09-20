@@ -1,4 +1,5 @@
 parameter [5:0] CMD0_GO_IDLE         = 'd0,
+                CMD1_SEND_OP_COND    = 'd1,
                 CMD2_ALL_SEND_CID    = 'd2,
                 CMD3_SEND_REL_ADDR   = 'd3,
                 CMD4_SET_DSR         = 'd4,
@@ -25,6 +26,9 @@ parameter [5:0] CMD0_GO_IDLE         = 'd0,
                
                 CMD55_APP_CMD        = 'd55,
                 CMD56_GEN_CMD        = 'd56,
+
+                CMD58_READ_OCR       = 'd58,
+                CMD59_CRC_ON_OFF     = 'd59,
 
                 // unsupported
                 CMD28_SET_WRITE_PROT = 'd28,
@@ -94,3 +98,7 @@ parameter [3:0] CARD_IDLE   = 'd0,
                 CARD_RESVD4 = 'd13,
                 CARD_RESVD5 = 'd14,
                 CARD_RESVD6 = 'd15;
+
+parameter [7:0] SPI_START_TOKEN       = 'hFE,
+                SPI_START_BLOCK_TOKEN = 'hFC,
+                SPI_STOP_TRAN_TOKEN   = 'hFD;
