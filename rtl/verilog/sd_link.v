@@ -190,7 +190,8 @@ always @(posedge clk_50) begin
                      STAT_SIZE_OF_PROT_AREA, STAT_SPEED_CLASS, STAT_PERFORMANCE_MOVE, STAT_AU_SIZE,
                      4'h0, STAT_ERASE_SIZE, STAT_ERASE_TIMEOUT, STAT_ERASE_OFFSET, 16'h0};
       // set high speed capability bit
-      card_function_caps <= 112'h0032800180018001800180018001 | opt_enable_hs ? 112'd2 : 112'd0;
+      card_function_caps <= 112'h0032800180018001800180018001;
+      card_function_caps[1] <= opt_enable_hs;
       card_function <= 24'h0;
       card_function_check <= 24'h0;   
    
@@ -336,7 +337,7 @@ always @(posedge clk_50) begin
             CARD_IDLE: begin
             if(cmd_in_arg[11:8] == 4'b0001) begin
                resp_type <= RESP_R7;
-               resp_arg <= {20'h0, 4'b0001, cmd_in_arg[7:0]};
+               resp_arg[31:0] <= {20'h0, 4'b0001, cmd_in_arg[7:0]};
             end else resp_type <= RESP_NONE;
             end
          endcase
