@@ -1,6 +1,6 @@
 CAPI=2:
 
-name : ::sd_device:0
+name : ::sd_device:0-r1
 
 description : SD card emulator from ProjectVault
 
