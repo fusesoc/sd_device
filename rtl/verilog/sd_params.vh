@@ -32,12 +32,6 @@ parameter [0:0]  CSD_READ_BL_PARTIAL    = 'h0;         // partial blocks for rea
 parameter [0:0]  CSD_WRITE_BLK_MISALIGN = 'h0;         // write block misalignment
 parameter [0:0]  CSD_READ_BLK_MISALIGN  = 'h0;         // read block misalignment
 parameter [0:0]  CSD_DSR_IMPL           = 'h0;         // DSR implemented
-parameter [21:0] CSD_C_SIZE             = 'd249;       // 1020 blocks of nand   
-                                                       // device size (please see p.98 of Simplified Spec 2.00)
-                                                       // memory capacity = (C_SIZE+1) * 512K byte
-                                                       // 22'h1010 is ~2gb, minimal legal size for SDHC
-                                                       // however any size is functional
-parameter [31:0] SD_TOTAL_BLOCKS        = (CSD_C_SIZE+1) * 1024;
 parameter [0:0]  CSD_ERASE_BLK_EN       = 'h1;         // erase single block enable
 parameter [6:0]  CSD_SECTOR_SIZE        = 'h7F;        // erase sector size
 parameter [6:0]  CSD_WP_GRP_SIZE        = 'h0;         // write protect group size

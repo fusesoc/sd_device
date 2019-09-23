@@ -48,6 +48,12 @@ module sd_top (
    // debug (optional)
 );
 
+parameter [21:0] CSD_C_SIZE             = 'd249;       // 1020 blocks of nand
+                                                       // device size (please see p.98 of Simplified Spec 2.00)
+                                                       // memory capacity = (C_SIZE+1) * 512K byte
+                                                       // 22'h1010 is ~2gb, minimal legal size for SDHC
+                                                       // however any size is functional
+
 wire        bram_rd_ext_clk;
 wire [6:0]  bram_rd_ext_addr;
 wire        bram_rd_ext_wren;
@@ -203,7 +209,9 @@ sd_mgr isdm (
 );
 
 
-sd_link isdl (
+sd_link
+  #(.CSD_C_SIZE (CSD_C_SIZE))
+isdl (
    .clk_50               ( clk_50 ),
    .reset_n              ( reset_n ),
 

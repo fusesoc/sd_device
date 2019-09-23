@@ -84,6 +84,9 @@ module sd_link (
 `include "sd_params.vh"
 `include "sd_const.vh"
 
+parameter  [21:0] CSD_C_SIZE             = 'd249;
+localparam [31:0] SD_TOTAL_BLOCKS        = ({10'd0,CSD_C_SIZE}+1) * 1024;
+
 reg  [47:0]  cmd_in_latch;
 //    wire   [5:0]   cmd_in_cmd = cmd_in_latch[45:40] /* synthesis noprune */;
 assign cmd_in_cmd = cmd_in_latch[45:40];
